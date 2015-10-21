@@ -70,6 +70,19 @@ def pinModePWM(pin):
   except IOError:
     print "IOError: could not export pwm"
 
+  try:
+    with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/enable","w") as enable:
+      enable.write("1")
+  except IOError:
+    print "IOError: could not enable pwm"
+
+  try:
+    with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/period","w") as p:
+      p.write(str(PERIOD))
+  except IOError:
+    print "IOError: could not set pwm period"
+
+
 
 def digitalRead(pin):
   # gets the real pin
@@ -95,21 +108,9 @@ def analogRead(pin):
   except IOError:
     print("IOError: Could't read in_voltage" + str(pin))
 
-def analogWrite(pin, value):
+def analogWrite(pin, duty_cycle):
   # gets the real pin
   pin = pinDict[pin]
-  try:
-    with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/enable","w") as enable:
-      enable.write("1")
-  except IOError:
-    print "IOError: could not enable pwm"
-
-  try:
-    with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/period","w") as p:
-      p.write(str(PERIOD))
-  except IOError:
-    print "IOError: could not set pwm period"
-
   try:
     with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w") as d:
       d.write(str(duty_cycle))
@@ -139,6 +140,12 @@ def unexport():
       print("INFO: GPIO %d dosen't exists, skipping unexport", pin)
 
   for pin in pinsSetPWM:
+    try:
+      with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w") as d:
+        d.write(str(0))
+    except IOError:
+      print "IOError: could not set pwm duty_cycle"
+    
     try:
       with open("/sys/class/pwm/pwmchip0/unexport","w") as openFile:
         openFile.write(str(pin))
@@ -187,7 +194,8 @@ def main():
 
     time.sleep(1)
 
-    duty_cycle = (duty_cycle + 100000) % 1000000
-    duty_cycle < 400000 ? duty_cycle = 400000
+    duty_cycle = (duty_cycle + 100000)
+    if duty_cycle > 1000000:
+      duty_cycle = 400000
 
 main() 
