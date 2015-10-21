@@ -10,6 +10,7 @@ LOW = 0
 HIGH = 1
 OUTPUT = "out"
 INPUT = "in"
+PERIOD = 1000000 #PWM Period
 # pinmap arduino -> galileo
 pinDict = {'A0': 37,'A1': 36, 'A2': 23, 'A3': 22, 2: 14, 3: 3, 4: 28, 5: 5, 6: 6, 7: 27, 8: 26, 9: 1, 10: 7, 11: 4, 12: 38, 13: 39, 'ledGalileo': 3}
 
@@ -94,12 +95,8 @@ def analogRead(pin):
   except IOError:
     print("IOError: Could't read in_voltage" + str(pin))
 
-def analogWrite(pin):
+def analogWrite(pin, value):
   # gets the real pin
-  pin = pinDict[pin]
-  pass
-
-def PWM(pin, period, duty_cycle):
   pin = pinDict[pin]
   try:
     with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/enable","w") as enable:
@@ -109,13 +106,15 @@ def PWM(pin, period, duty_cycle):
 
   try:
     with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/period","w") as p:
-      p.write(str(period))
+      p.write(str(PERIOD))
   except IOError:
     print "IOError: could not set pwm period"
 
-  openFile = open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w")
-  openFile.write(str(duty_cycle))
-  openFile.close()
+  try:
+    with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w") as d:
+      d.write(str(duty_cycle))
+  except IOError:
+    print "IOError: could not set pwm duty_cycle"
 
 def println(s):
   openFile = open("/dev/ttyGS0", "w")
@@ -172,7 +171,7 @@ def main():
     print("digitalRead = " + digitalRead(PIN7))
 
     digitalWrite(PININ1, LOW)
-    PWM(PINPWM, period, duty_cycle)
+    analogWrite(PINPWM, duty_cycle)
 
     digitalWrite(LED, HIGH)
     digitalWrite(LEDOFF, HIGH)
@@ -188,6 +187,7 @@ def main():
 
     time.sleep(1)
 
-    duty_cycle = (duty_cycle + 50000) % 1000000
+    duty_cycle = (duty_cycle + 100000) % 1000000
+    duty_cycle < 400000 ? duty_cycle = 400000
 
 main() 
