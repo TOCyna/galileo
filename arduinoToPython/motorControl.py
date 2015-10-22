@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import sys
 import time
 import select
+import serial
 
 # constants
 LOW = 0
@@ -29,7 +30,7 @@ DIGITALPINMODE = "strong"
 EN = 10 # pino de enable do L293d
 IN1 = 11 # pino A1 de direcao do L293D
 IN2 = 12 # pino A2 de direcao do L293D
-ENCODER = A0
+ENCODER = 'A0'
 MSB = 9
 B4 = 8
 B3 = 7
@@ -47,16 +48,18 @@ MIN_POWER = 60
 MAX_POWER = 255
 MIN_ENCODER = 0
 MAX_ENCODER = 1022
-CONST_ENCODER
+CONST_ENCODER = 0.0
 ERRO = 0
 INTERVAL = 200
 OFFSET_COM = 200
+BAUD_RATE = 115200
 
 # constantes do motor
 MOTOR_FREE = 0
 MOTOR_STOP = 220
 
 # variaveis de controle
+ser = serial.Serial("/dev/ttyGS0", 115200)
 inString = ""
 isHearing = 0
 input = 0
@@ -64,11 +67,13 @@ com = 0
 lastPrintedAngle = 0
 
 # variaveis do digital input
-selectAngle[5]
-selectMode[3]
+# PAROU AQUI
+# selectAngle = []
+# selectMode = [] 
+
 
 def setup():
-    # Serial.begin(9600)
+    # connect("/dev/ttyGS0")
 
     pinModePWM(EN) # PWM    
     # PonteH
@@ -76,7 +81,7 @@ def setup():
     pinMode(IN2, OUTPUT) # left gate L293
 
     # switch
-    pinMode(SELECT, INPUT
+    pinMode(SELECT, INPUT)
     pinMode(NULL1, INPUT)
     pinMode(NULL2, INPUT)
     pinMode(LSB, INPUT)
@@ -88,47 +93,50 @@ def setup():
     pinModeAnalog(ENCODER) 
     pinMode(LED, OUTPUT)
 
-    # CONST_ENCODER = (float)MAX_ANGLE / (float)MAX_ENCODER //debug
+    CONST_ENCODER = MAX_ANGLE / MAX_ENCODER
 
-# def serialRead():
-#   if (Serial.available()) {
-#     int inChar = Serial.read()
-#     char a = (char)inChar
-#     if (a == 'a') { //Inicio de mensagem
-#       inString = ""
-#       com = 0
-#     }
-#     if (isDigit(inChar)) { //Mensagem
-#       inString += (char)inChar
-#     }
-#     if (inChar == 'c') { //Fim de mensagem
-#       com = inString.toInt()
-#       if (com == 111) {
-#         isHearing = 1 //Habilita o envio Serial (Handshack)
-#         Serial.println("a111c")
-#         Serial.flush()
-#         digitalWrite(LED, HIGH)
-#       } else if (com == 101) {
-#         isHearing = 0 //Desabilita o envio Serial (CloseConection)
-#         digitalWrite(LED, LOW)
-#       } else if (com == 100) {
-#         realMeanPosition()
-#       } else {
-#         com = com - OFFSET_COM
-#         if (com >= MIN_ANGLE and com <= MAX_ANGLE) {
-#           input = com
-#         }
-#       }
-#       com = 0 //Limpa para receber proxima mensagem
-#       inString = "" //Limpa para receber proxima mensagem
-#     }
-#   }
-# }
+def connect(text):
+    ser = serial.Serial(text, 115200)
+    if not ser.isOpen():
+        ser.open()
+    if ser.isOpen:
+        ser.flushInput()
+        ser.write("a111c".encode())
+
+def serialRead():
+    if ser.isOpen():
+        if ser.inWaiting():
+            inChar = ser.read(1)
+            if inChar:
+                inChar = char.decode()
+            if inChar == 'a': # Inicio de mensagem
+                inString = ""
+                com = 0
+            elif inChar.isdigit(): # Mensagem
+                inString += inChar
+            if inChar == 'c': # Fim de mensagem
+                com = int(inString)
+                if com == 111:
+                    isHearing = 1 # Habilita o envio Serial (Handshack)
+                    println("a111c")
+                    ser.flushInput()
+                    digitalWrite(LED, HIGH)
+                elif com == 101:
+                    isHearing = 0 # Desabilita o envio Serial (CloseConection)
+                    digitalWrite(LED, LOW)
+                elif com == 100:
+                    realMeanPosition()
+                else:
+                    com = com - OFFSET_COM
+                    if com >= MIN_ANGLE and com <= MAX_ANGLE:
+                        input = com
+                com = 0 # Limpa para receber proxima mensagem
+                inString = "" # Limpa para receber proxima mensagem
 
 # begin -- motor functions
 
 # Envia mensagem dentro do protocolo
-def printAngle(int angle):
+def printAngle(angle):
     if lastPrintedAngle != angle and isHearing:
         s = str(angle + OFFSET_COM)
         # Serial.println('a' + s + 'c')
@@ -180,10 +188,10 @@ def goToDegree(degree):
 
         if (realPosition < (degree - ERRO)) or (realPosition > (degree + ERRO)):
             distance = realPosition - degree
-                if distance < 0:
-                    goClockWise(abs(distance))
-                else:
-                    goCClockWise(distance)
+            if distance < 0:
+                goClockWise(abs(distance))
+            else:
+                goCClockWise(distance)
             realPosition = realMeanPosition()
 
     if realPosition == degree:
@@ -265,10 +273,10 @@ def analogRead(pin):
     # gets the number of pin AX where X is a number 
     pin = pin[1]
     try:
-        with open("/sys/bus/iio/devices/iio:device0/in_voltage" + str(pin) + "_raw", 'r') as openFile:
+        with open("/sys/bus/iio/devices/iio\:device0/in_voltage" + str(pin) + "_raw", 'r') as openFile:
             return openFile.read()
-        except IOError:
-            print("IOError: Could't read in_voltage" + str(pin))
+    except IOError:
+        print "IOError: Could't read in_voltage" + str(pin)
 
 def analogWrite(pin, duty_cycle):
     # gets the real pin
@@ -308,7 +316,7 @@ def unexport():
     for pin in pinsSetPWM:
         try:
             with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w") as d:
-            d.write(str(0))
+                d.write(str(0))
         except IOError:
             print "IOError: could not set pwm duty_cycle"
     
