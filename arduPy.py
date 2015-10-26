@@ -38,6 +38,7 @@ pinsSetPWM = []
 # functions
 def pinMode(pin, direction):
   # gets the real pin
+  pin = pinDict[pin]
   pinsSet.append(pin)
   try:
     with open("/sys/class/gpio/export", "w") as openFile:
@@ -45,20 +46,21 @@ def pinMode(pin, direction):
   except IOError:
       print("INFO: GPIO %d already exists, skipping export", pin)
 
-  openFile = open("/sys/class/gpio/gpio" + str(pin) + "/direction", "w")
-  openFile.write(direction)
-  openFile.close()
+  try:
+    openFile = open("/sys/class/gpio/gpio" + str(pin) + "/direction", "w")
+    openFile.write(direction)
+    openFile.close()
+  except IOError:
+    print("INFO: Cant set strong in GPIO %d", pin)
 
 def pinModeDigital(pin, direction):
-  pin = pinDict[pin]
   pinMode(pin, direction)
-  print pin
+  pin = pinDict[pin]
   openFile = open("/sys/class/gpio/gpio" + str(pin) + "/drive", "w")
   openFile.write(DIGITALPINMODE)
-  openFile.close()
+  # openFile.close()
 
 def pinModeAnalog(pin):
-  pin = pinDict[pin]
   pinMode(pin, OUTPUT)
   digitalWrite(pin, 0)
 
@@ -153,7 +155,7 @@ def unexport():
 
 
 def main():
-  # pinModeDigital(LED, OUTPUT)
+  pinModeDigital(LED, OUTPUT)
   pinMode(PIN7, INPUT)
   pinModeAnalog(PINA0)
   pinModeDigital(LEDOFF, OUTPUT)

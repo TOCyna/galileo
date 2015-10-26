@@ -68,9 +68,8 @@ lastPrintedAngle = 0
 
 # variaveis do digital input
 # PAROU AQUI
-# selectAngle = []
-# selectMode = [] 
-
+selectAngle = [0, 0, 0, 0, 0]
+selectMode = [0, 0, 0] 
 
 def setup():
     # connect("/dev/ttyGS0")
@@ -137,6 +136,7 @@ def serialRead():
 
 # Envia mensagem dentro do protocolo
 def printAngle(angle):
+    global lastPrintedAngle
     if lastPrintedAngle != angle and isHearing:
         s = str(angle + OFFSET_COM)
         # Serial.println('a' + s + 'c')
@@ -169,7 +169,7 @@ def goCClockWise(distance): # power 0 to 255
     ## delay(50)
 
 def realPosition():
-    value = analogRead(ENCODER)
+    value = float(analogRead(ENCODER))
     ## int degree = map (value,0,1023,0, 360)
     return value
 
@@ -177,7 +177,9 @@ def realMeanPosition():
     value = 0
     sampleSize = 10
     for i in xrange(0, sampleSize):
-        value += analogRead(ENCODER)
+        aRead = analogRead(ENCODER)
+        if aRead:
+            value += analogRead(ENCODER)
     angle = int((value/sampleSize) * CONST_ENCODER)
     printAngle(angle)
     return angle
