@@ -67,10 +67,7 @@ pinsSetPWM = []
 
 # variaveis do digital input
 selectAngle = [0, 0, 0, 0, 0]
-selectMode = [0, 0, 0] 
-
-global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
-
+selectMode = [0, 0, 0]
 
 def setup():
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -110,7 +107,6 @@ def connect(text):
 def serialRead():
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
-    global isHearing, com, inString
     if ser.isOpen():
         if ser.inWaiting():
             inChar = ser.read(1)
@@ -245,14 +241,14 @@ def pinMode(pin, direction):
             openFile.write(str(pin))
             openFile.close()
     except IOError:
-        print("INFO: GPIO %d already exists, skipping export", pin)
+        print("INFO: GPIO %d already exists, skipping export" % pin)
 
     try:
         with open("/sys/class/gpio/gpio" + str(pin) + "/direction", "w") as openFile:
             openFile.write(direction)
             openFile.close()
     except IOError:
-        print("INFO: Can't set direction in GPIO %d", pin)
+        print("INFO: Can't set direction in GPIO %d" % pin)
 
 def pinModeDigital(pin, direction):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -265,7 +261,7 @@ def pinModeDigital(pin, direction):
             openFile.write(DIGITALPINMODE)
             openFile.close()
     except IOError:
-        print("INFO: Can't set drive mode in GPIO %d", pin)
+        print("INFO: Can't set drive mode in GPIO %d" % pin)
 
 def pinModeAnalog(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -283,21 +279,21 @@ def pinModePWM(pin):
             export.write(str(pin))
             export.close()
     except IOError:
-        print("IOError: could not export pwm %d", pin)
+        print("IOError: could not export pwm %d" % pin)
 
     try:
         with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/enable","w") as enable:
             enable.write("1")
             enable.close()
     except IOError:
-        print("IOError: could not enable pwm %d", pin)
+        print("IOError: could not enable pwm %d" % pin)
 
     try:
         with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/period","w") as p:
             p.write(str(PERIOD))
             p.close()
     except IOError:
-        print("IOError: could not set pwm period %d", pin)
+        print("IOError: could not set pwm period %d" % pin)
 
 def digitalRead(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -309,7 +305,7 @@ def digitalRead(pin):
             openFile = str(openFile.read())
             openFile.close()
     except IOError:
-        print("IOError: could not read from GPIO %d", pin)
+        print("IOError: could not read from GPIO %d" % pin)
 
     return value
   
@@ -323,7 +319,7 @@ def digitalWrite(pin, value):
             openFile.write(str(value))
             openFile.close()
     except IOError:
-        print("IOError: could not write value to GPIO %d", pin)
+        print("IOError: could not write value to GPIO %d" % pin)
 
 def analogRead(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -352,7 +348,7 @@ def analogWrite(pin, duty_cycle):
 
 def println(s):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
-
+    print(s+"\n")
     try:
         with open("/dev/ttyGS0", "w") as openFile:
             openFile.write(s + "\n")
@@ -362,6 +358,7 @@ def println(s):
 
 def printl(s):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+    print(s)
 
     try:
         with open("/dev/ttyGS0", "w") as openFile:
@@ -387,7 +384,7 @@ def unexport():
                 openFile.write(str(pin))
                 openFile.close()
         except IOError:
-            print("INFO: GPIO %d dosen't exists, skipping unexport", pin)
+            print("INFO: GPIO %d dosen't exists, skipping unexport" % pin)
 
     for pin in pinsSetPWM:
         try:
@@ -402,7 +399,7 @@ def unexport():
                 openFile.write(str(pin))
                 openFile.close()
         except IOError:
-            print("INFO: PWM %d dosen't exists, skipping unexport", pin)
+            print("INFO: PWM %d dosen't exists, skipping unexport" % pin)
 
 # end -- other "arduino"
 
