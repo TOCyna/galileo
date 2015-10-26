@@ -150,6 +150,7 @@ def unexport():
     try:
       with open("/sys/class/pwm/pwmchip0/unexport","w") as openFile:
         openFile.write(str(pin))
+        openFile.close()
     except IOError:
       print("INFO: PWM %d dosen't exists, skipping unexport", pin)
 
