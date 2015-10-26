@@ -210,22 +210,22 @@ def motorMap(distance):
 # begin -- functions "arduino"
 
 def pinMode(pin, direction):
-  # gets the real pin
-  pin = pinDict[pin]
-  pinsSet.append(pin)
-  try:
-    with open("/sys/class/gpio/export", "w") as openFile:
-      openFile.write(str(pin))
-      openFile.close()
-  except IOError:
-      print("INFO: GPIO %d already exists, skipping export", pin)
+    # gets the real pin
+    pin = pinDict[pin]
+    pinsSet.append(pin)
+    try:
+        with open("/sys/class/gpio/export", "w") as openFile:
+            openFile.write(str(pin))
+            openFile.close()
+        except IOError:
+            print("INFO: GPIO %d already exists, skipping export" % pin)
 
-  try:
-    with open("/sys/class/gpio/gpio" + str(pin) + "/direction", "w") as openFile:
-      openFile.write(direction)
-      openFile.close()
-  except IOError:
-    print("INFO: Can't set direction in GPIO %d", pin)
+    try:
+        with open("/sys/class/gpio/gpio" + str(pin) + "/direction", "w") as openFile:
+            openFile.write(direction)
+            openFile.close()
+        except IOError:
+            print("INFO: Can't set direction in GPIO %d" % pin)
 
 def pinModeDigital(pin, direction):
   pinMode(pin, direction)
@@ -236,7 +236,7 @@ def pinModeDigital(pin, direction):
       openFile.write(DIGITALPINMODE)
       openFile.close()
   except IOError:
-    print("INFO: Can't set drive mode in GPIO %d", pin)
+    print("INFO: Can't set drive mode in GPIO %d" % pin)
 
 def pinModeAnalog(pin):
   pinMode(pin, OUTPUT)
@@ -250,21 +250,21 @@ def pinModePWM(pin):
       export.write(str(pin))
       export.close()
   except IOError:
-    print("IOError: could not export pwm %d", pin)
+    print("IOError: could not export pwm %d" % pin)
 
   try:
     with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/enable","w") as enable:
       enable.write("1")
       enable.close()
   except IOError:
-    print("IOError: could not enable pwm %d", pin)
+    print("IOError: could not enable pwm %d" % pin)
 
   try:
     with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/period","w") as p:
       p.write(str(PERIOD))
       p.close()
   except IOError:
-    print("IOError: could not set pwm period %d", pin)
+    print("IOError: could not set pwm period %d" % pin)
 
 def digitalRead(pin):
   # gets the real pin
@@ -274,7 +274,7 @@ def digitalRead(pin):
       openFile = str(openFile.read())
       openFile.close()
   except IOError:
-    print("IOError: could not read from GPIO %d", pin)
+    print("IOError: could not read from GPIO %d" % pin)
 
   return value
   
@@ -286,7 +286,7 @@ def digitalWrite(pin, value):
       openFile.write(str(value))
       openFile.close()
     except IOError:
-      print("IOError: could not write value to GPIO %d", pin)
+      print("IOError: could not write value to GPIO %d" % pin)
 
 def analogRead(pin):
   # gets the number of pin AX where X is a number 
@@ -340,7 +340,7 @@ def unexport():
         openFile.write(str(pin))
         openFile.close()
     except IOError:
-      print("INFO: GPIO %d dosen't exists, skipping unexport", pin)
+      print("INFO: GPIO %d dosen't exists, skipping unexport" % pin)
 
   for pin in pinsSetPWM:
     try:
@@ -355,7 +355,7 @@ def unexport():
         openFile.write(str(pin))
         openFile.close()
     except IOError:
-      print("INFO: PWM %d dosen't exists, skipping unexport", pin)
+      print("INFO: PWM %d dosen't exists, skipping unexport" % pin)
 
 # end -- other "arduino"
 
