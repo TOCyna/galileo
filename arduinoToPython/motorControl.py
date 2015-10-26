@@ -42,7 +42,7 @@ LED = 13
 # constantes globais
 MIN_ANGLE = 0
 MAX_ANGLE = 240
-MIN_POWER = 60
+MIN_POWER = 100
 MAX_POWER = 255
 MIN_ENCODER = 0
 MAX_ENCODER = 1022
@@ -94,6 +94,8 @@ def setup():
 
     CONST_ENCODER = MAX_ANGLE / MAX_ENCODER
 
+    print("endsetup")
+
 def connect(text):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
@@ -103,6 +105,8 @@ def connect(text):
     if ser.isOpen:
         ser.flushInput()
         ser.write("a111c".encode())
+
+    print("endconnect")
 
 def serialRead():
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -136,6 +140,8 @@ def serialRead():
                 com = 0 # Limpa para receber proxima mensagem
                 inString = "" # Limpa para receber proxima mensagem
 
+    print("endserial")
+
 # begin -- motor functions
 
 # Envia mensagem dentro do protocolo
@@ -147,6 +153,8 @@ def printAngle(angle):
         # Serial.println('a' + s + 'c')
         lastPrintedAngle = angle
 
+    print("endprintAngle")
+
 def motorStop(): # power 0 to 255
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
@@ -154,12 +162,16 @@ def motorStop(): # power 0 to 255
     digitalWrite(IN1, HIGH)
     digitalWrite(IN2, HIGH)
 
+    print("endmotorStop")
+
 def motorFree(): # power 0 to 255
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
     analogWrite(EN, MOTOR_FREE)
     digitalWrite(IN1, LOW)
     digitalWrite(IN2, LOW)
+
+    print("endmotorFree")
 
 def goClockWise(distance): # power 0 to 255
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -171,6 +183,8 @@ def goClockWise(distance): # power 0 to 255
     digitalWrite(IN2, HIGH)
     ## delay(50)
 
+    print("endgoClockWise")
+
 def goCClockWise(distance): # power 0 to 255
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
@@ -181,12 +195,16 @@ def goCClockWise(distance): # power 0 to 255
     digitalWrite(IN2, LOW)
     ## delay(50)
 
+    print("endgoCClockWise")
+
 def realPosition():
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
     value = analogRead(ENCODER)
     ## int degree = map (value,0,1023,0, 360)
     return value
+
+    print("endrealPosition")
 
 def realMeanPosition():
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -198,6 +216,8 @@ def realMeanPosition():
     angle = int((value/sampleSize) * CONST_ENCODER)
     printAngle(angle)
     return angle
+
+    print("endrealMeanPosition")
 
 def goToDegree(degree):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -216,14 +236,20 @@ def goToDegree(degree):
     if realPosition == degree:
         motorStop()
 
+    print("endgoToDegree")
+
 def newMap(x, in_min, in_max, out_min, out_max):
     ## http://forum.arduino.cc/index.php?topic=38006.0
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+    print("endnewMap")
 
 def motorMap(distance):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
     return map(distance, MIN_ANGLE, MAX_ANGLE, MIN_POWER, MAX_POWER)
+
+    print("endmotorMap")
 
 # end -- motor functions
 
@@ -250,6 +276,8 @@ def pinMode(pin, direction):
     except IOError:
         print("INFO: Can't set direction in GPIO %d" % pin)
 
+    print("printpinMode")
+
 def pinModeDigital(pin, direction):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
@@ -263,11 +291,15 @@ def pinModeDigital(pin, direction):
     except IOError:
         print("INFO: Can't set drive mode in GPIO %d" % pin)
 
+    print("endpinModeDigital")
+
 def pinModeAnalog(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
     pinMode(pin, OUTPUT)
     digitalWrite(pin, 0)
+
+    print("endpinModeAnalog")
 
 def pinModePWM(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -295,6 +327,8 @@ def pinModePWM(pin):
     except IOError:
         print("IOError: could not set pwm period %d" % pin)
 
+    print("endpinModePWM")
+
 def digitalRead(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
@@ -306,6 +340,8 @@ def digitalRead(pin):
             openFile.close()
     except IOError:
         print("IOError: could not read from GPIO %d" % pin)
+
+    print("enddigitalRead")
 
     return value
   
@@ -320,6 +356,8 @@ def digitalWrite(pin, value):
             openFile.close()
     except IOError:
         print("IOError: could not write value to GPIO %d" % pin)
+
+    print("endigitalWrite")
 
 def analogRead(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
