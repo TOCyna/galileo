@@ -95,7 +95,7 @@ def setup():
     CONST_ENCODER = MAX_ANGLE / float(MAX_ENCODER)
     # print "CONST_ENCODER: ", CONST_ENCODER
 
-    # inputAngle = readStorageValue()
+    inputAngle = readStorageValue()
     # dbug("StorageValue: " + str(inputAngle))
 
 def connect(text):
@@ -116,8 +116,9 @@ def serialRead():
     if ser.isOpen():
         if ser.inWaiting():
             inChar = ser.read(1)
+            dbug("inChar: " + str(inChar))
             if inChar:
-                inChar = char.decode()
+                inChar = inChar.decode()
             if inChar == 'a': # Inicio de mensagem
                 inString = ""
                 com = 0
@@ -139,6 +140,7 @@ def serialRead():
                     com = com - OFFSET_COM
                     if com >= MIN_ANGLE and com <= MAX_ANGLE:
                         inputAngle = com
+                        storegeValue(com)
                 com = 0 # Limpa para receber proxima mensagem
                 inString = "" # Limpa para receber proxima mensagem
 
@@ -155,7 +157,7 @@ def readStorageValue():
 def storegeValue(value):
     try:
         with open("/home/root/storage", "w") as openFile:
-            openFile.write(value)
+            openFile.write(str(value))
             openFile.close()
     except IOError:
         print("IOError: Could not write %d to storage" % value)
@@ -299,8 +301,6 @@ def pinMode(pin, direction):
     except IOError:
         print("INFO: Can't set direction in GPIO %d" % pin)
 
-    # print("printpinMode")
-
 def pinModeDigital(pin, direction):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
@@ -314,15 +314,11 @@ def pinModeDigital(pin, direction):
     except IOError:
         print("INFO: Can't set drive mode in GPIO %d" % pin)
 
-    # print("endpinModeDigital")
-
 def pinModeAnalog(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
     pinMode(pin, OUTPUT)
     digitalWrite(pin, 0)
-
-    # print("endpinModeAnalog")
 
 def pinModePWM(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -350,11 +346,8 @@ def pinModePWM(pin):
     except IOError:
         print("IOError: could not set pwm period %d" % pin)
 
-    # print("endpinModePWM")
-
 def digitalRead(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
-
     # gets the real pin
     pin = pinDict[pin]
     value = 0
@@ -364,8 +357,6 @@ def digitalRead(pin):
             openFile.close()
     except IOError:
         print("IOError: could not read from GPIO %d" % pin)
-
-    # print("enddigitalRead")
 
     return value
   
@@ -380,8 +371,6 @@ def digitalWrite(pin, value):
             openFile.close()
     except IOError:
         print("IOError: could not write value to GPIO %d" % pin)
-
-    # print("endigitalWrite")
 
 def analogRead(pin):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -412,17 +401,14 @@ def analogWrite(pin, duty_cycle):
 
     # time.sleep(0.5)
 
-def println(angle):
-    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode   
-    if self.serial.isOpen():
-        text = "a" + str(angle + 200) + "c\n"
-        self.serial.write(text.encode())
+def println(s):
+    if ser.isOpen():
+        s = s + "\n"
+        ser.write(s.encode())
 
-def printl(angle):
-    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode   
-    if self.serial.isOpen():
-        text = "a" + str(angle + 200) + "c"
-        self.serial.write(text.encode())
+def printl(s):
+    if ser.isOpen():
+        ser.write(s.encode())
 
 # end -- functions "arduino"
 
@@ -461,7 +447,8 @@ def unexport():
 # end -- other "arduino"
 
 def dbug(s):
-    print s
+    # print s
+    pass
 
 if __name__ == "__main__":
     setup()
