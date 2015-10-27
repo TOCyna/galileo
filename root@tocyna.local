@@ -13,7 +13,7 @@ OUTPUT = "out"
 INPUT = "in"
 PERIOD = 1000000 #PWM Period
 # pinmap arduino -> galileo
-pinDict = {'A0': 37,'A1': 36, 'A2': 23, 'A3': 22, 2: 14, 3: 3, 4: 28, 5: 5, 6: 6, 7: 27, 8: 26, 9: 1, 10: 7, 11: 4, 12: 38, 13: 39, 'ledGalileo': 3}
+pinDict = {'A0': 37,'A1': 36, 'A2': 23, 'A3': 22, 2: 14, 3: 3, 4: 28, 5: 5, 6: 6, 7: 27, 8: 26, 9: 1, 10: 7, 11: 25, 12: 38, 13: 39, 'ledGalileo': 3}
 # When configured for output GPIO ports that are connected to CY8C9520A can be configured to one of the following drive modes:
   # Resistive high, strong low (drive = pullup)
   #   This is the default, but it not suitable for driving devices that source significant current, for example for driving an LED connected between GPIO port and GND (it will work though if the LED is connected between GPIO and 5V or 3.3V rails)
@@ -42,12 +42,12 @@ LED = 13
 # constantes globais
 MIN_ANGLE = 0
 MAX_ANGLE = 247
-MIN_POWER = 350000
+MIN_POWER = 450000
 MAX_POWER = 1000000
 MIN_ENCODER = 2
 MAX_ENCODER = 3685
 CONST_ENCODER = 0.0
-ERRO = 10
+ERRO = 1
 INTERVAL = 200
 OFFSET_COM = 200
 BAUD_RATE = 115200
@@ -59,8 +59,8 @@ MOTOR_STOP = 1000000
 # variaveis de controle
 ser = serial.Serial("/dev/ttyGS0", 115200)
 inString = ""
-isHearing = 0
-inputAngle = 0
+isHearing = 1
+inputAngle = 90
 lastPrintedAngle = 0
 pinsSet = []
 pinsSetPWM = []
@@ -160,18 +160,19 @@ def printAngle(angle):
 def motorStop(): # power 0 to 255
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
-    analogWrite(EN, MOTOR_STOP) 
     digitalWrite(IN1, HIGH)
     digitalWrite(IN2, HIGH)
+    analogWrite(EN, MOTOR_STOP) 
 
     # print("endmotorStop")
 
 def motorFree(): # power 0 to 255
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
-    analogWrite(EN, MOTOR_FREE)
     digitalWrite(IN1, LOW)
     digitalWrite(IN2, LOW)
+    analogWrite(EN, MOTOR_FREE)
+    print "oi, sou livre"
 
     # print("endmotorFree")
 
@@ -180,9 +181,10 @@ def goClockWise(distance): # power 0 to 255
 
     power = motorMap(distance)
     ## Serial.println("C: " + String(power))
-    analogWrite(EN, power)
     digitalWrite(IN1, LOW)
     digitalWrite(IN2, HIGH)
+    analogWrite(EN, power)
+    print "oi, saiu a nota de tc"
     ## delay(50)
 
     # print("endgoClockWise")
@@ -192,9 +194,10 @@ def goCClockWise(distance): # power 0 to 255
 
     power = motorMap(distance)
     ## Serial.println("CC: " + String(power))
-    analogWrite(EN, power)
     digitalWrite(IN1, HIGH)
     digitalWrite(IN2, LOW)
+    analogWrite(EN, power)
+    print "oi, saiu a nota de tc2"
     ## delay(50)
 
     # print("endgoCClockWise")
@@ -240,9 +243,9 @@ def goToDegree(degree):
             else:
                 goCClockWise(distance)
             realPosition = realMeanPosition()
-
-    if realPosition == degree:
-        motorStop()
+        else:
+            motorStop()
+            motorFree()
 
     # print("endgoToDegree")
 
@@ -359,6 +362,7 @@ def digitalWrite(pin, value):
 
     # gets the real pin
     pin = pinDict[pin]
+    print "digitalwrite: " ,pin, value
     try:
         with open("/sys/class/gpio/gpio" + str(pin) + "/value", "w") as openFile:
             openFile.write(str(value))
@@ -393,7 +397,7 @@ def analogWrite(pin, duty_cycle):
     except IOError:
         print("IOError: could not set pwm duty_cycle")
 
-    time.sleep(0.5)
+    # time.sleep(0.5)
 
 def println(s):
     global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
