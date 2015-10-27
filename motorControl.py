@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import sys
 import time
 import select
+import serial
 
 # constants
 LOW = 0
@@ -12,8 +13,7 @@ OUTPUT = "out"
 INPUT = "in"
 PERIOD = 1000000 #PWM Period
 # pinmap arduino -> galileo
-pinDict = {'A0': 37,'A1': 36, 'A2': 23, 'A3': 22, 2: 14, 3: 3, 4: 28, 5: 5, 6: 6, 7: 27, 8: 26, 9: 1, 10: 7, 11: 4, 12: 38, 13: 39, 'ledGalileo': 3}
-
+pinDict = {'A0': 37,'A1': 36, 'A2': 23, 'A3': 22, 2: 14, 3: 3, 4: 28, 5: 5, 6: 6, 7: 27, 8: 26, 9: 1, 10: 7, 11: 25, 12: 38, 13: 39, 'ledGalileo': 3}
 # When configured for output GPIO ports that are connected to CY8C9520A can be configured to one of the following drive modes:
   # Resistive high, strong low (drive = pullup)
   #   This is the default, but it not suitable for driving devices that source significant current, for example for driving an LED connected between GPIO port and GND (it will work though if the LED is connected between GPIO and 5V or 3.3V rails)
@@ -24,178 +24,445 @@ pinDict = {'A0': 37,'A1': 36, 'A2': 23, 'A3': 22, 2: 14, 3: 3, 4: 28, 5: 5, 6: 6
   # (CY8C9520A also supports open drain and open source drive modes, but it is not currently exposed through SysFS)
 DIGITALPINMODE = "strong"
 
-# pins
-LED = 'ledGalileo'
-LEDOFF = 13
-PIN7 = 7
-PINA0 = 'A0'
-PININ1 = 11
-PININ2 = 12
-PINPWM = 10
+# alocacao dos pinos
+EN = 10 # pino de enable do L293d
+IN1 = 11 # pino A1 de direcao do L293D
+IN2 = 12 # pino A2 de direcao do L293D
+ENCODER = 'A0'
+MSB = 9
+B4 = 8
+B3 = 7
+B2 = 6
+LSB = 5
+NULL2 = 4
+NULL1 = 3
+SELECT = 2
+LED = 13
+
+# constantes globais
+MIN_ANGLE = 0
+MAX_ANGLE = 247
+MIN_POWER = 450000
+MAX_POWER = 1000000
+MIN_ENCODER = 2
+MAX_ENCODER = 3685
+CONST_ENCODER = 0.0
+ERRO = 1
+INTERVAL = 200
+OFFSET_COM = 200
+BAUD_RATE = 115200
+
+# constantes do motor
+MOTOR_FREE = 0
+MOTOR_STOP = 1000000
+
+# variaveis de controle
+ser = serial.Serial("/dev/ttyGS0", 115200)
+inString = ""
+isHearing = 1
+inputAngle = 90
+lastPrintedAngle = 0
 pinsSet = []
 pinsSetPWM = []
 
-# functions
+# variaveis do digital input
+selectAngle = [0, 0, 0, 0, 0]
+selectMode = [0, 0, 0]
+
+def setup():
+    global CONST_ENCODER,inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    # connect("/dev/ttyGS0")
+
+    pinModePWM(EN) # PWM    
+    # PonteH
+    pinMode(IN1, OUTPUT) # right gate L293d
+    pinMode(IN2, OUTPUT) # left gate L293
+
+    # switch
+    pinMode(SELECT, INPUT)
+    pinMode(NULL1, INPUT)
+    pinMode(NULL2, INPUT)
+    pinMode(LSB, INPUT)
+    pinMode(B2, INPUT)
+    pinMode(B3, INPUT)
+    pinMode(B4, INPUT)
+    pinMode(MSB, INPUT)
+
+    pinModeAnalog(ENCODER) 
+    pinMode(LED, OUTPUT)
+
+    CONST_ENCODER = MAX_ANGLE / float(MAX_ENCODER)
+    # print "CONST_ENCODER: ", CONST_ENCODER
+    # time.sleep(2)
+
+    # print("endsetup")
+
+def connect(text):
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    ser = serial.Serial(text, 115200)
+    if not ser.isOpen():
+        ser.open()
+    if ser.isOpen:
+        ser.flushInput()
+        ser.write("a111c".encode())
+
+    # print("endconnect")
+
+def serialRead():
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    if ser.isOpen():
+        if ser.inWaiting():
+            inChar = ser.read(1)
+            if inChar:
+                inChar = char.decode()
+            if inChar == 'a': # Inicio de mensagem
+                inString = ""
+                com = 0
+            elif inChar.isdigit(): # Mensagem
+                inString += inChar
+            if inChar == 'c': # Fim de mensagem
+                com = int(inString)
+                if com == 111:
+                    isHearing = 1 # Habilita o envio Serial (Handshack)
+                    println("a111c")
+                    ser.flushInput()
+                    digitalWrite(LED, HIGH)
+                elif com == 101:
+                    isHearing = 0 # Desabilita o envio Serial (CloseConection)
+                    digitalWrite(LED, LOW)
+                elif com == 100:
+                    realMeanPosition()
+                else:
+                    com = com - OFFSET_COM
+                    if com >= MIN_ANGLE and com <= MAX_ANGLE:
+                        inputAngle = com
+                com = 0 # Limpa para receber proxima mensagem
+                inString = "" # Limpa para receber proxima mensagem
+
+    # print("endserial")
+
+# begin -- motor functions
+
+# Envia mensagem dentro do protocolo
+def printAngle(angle):
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    if lastPrintedAngle != angle and isHearing:
+        s = str(angle + OFFSET_COM)
+        # Serial.println('a' + s + 'c')
+        lastPrintedAngle = angle
+
+    # print("endprintAngle")
+
+def motorStop(): # power 0 to 255
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    digitalWrite(IN1, HIGH)
+    digitalWrite(IN2, HIGH)
+    analogWrite(EN, MOTOR_STOP) 
+
+    # print("endmotorStop")
+
+def motorFree(): # power 0 to 255
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    digitalWrite(IN1, LOW)
+    digitalWrite(IN2, LOW)
+    analogWrite(EN, MOTOR_FREE)
+    print "oi, sou livre"
+
+    # print("endmotorFree")
+
+def goClockWise(distance): # power 0 to 255
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    power = motorMap(distance)
+    ## Serial.println("C: " + String(power))
+    digitalWrite(IN1, LOW)
+    digitalWrite(IN2, HIGH)
+    analogWrite(EN, power)
+    print "oi, saiu a nota de tc"
+    ## delay(50)
+
+    # print("endgoClockWise")
+
+def goCClockWise(distance): # power 0 to 255
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    power = motorMap(distance)
+    ## Serial.println("CC: " + String(power))
+    digitalWrite(IN1, HIGH)
+    digitalWrite(IN2, LOW)
+    analogWrite(EN, power)
+    print "oi, saiu a nota de tc2"
+    ## delay(50)
+
+    # print("endgoCClockWise")
+
+def realPosition():
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    value = analogRead(ENCODER)
+    ## int degree = map (value,0,1023,0, 360)
+    return value
+
+    # print("endrealPosition")
+
+def realMeanPosition():
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    value = 0
+    sampleSize = 10
+    for i in xrange(0, sampleSize):
+        value += int(analogRead(ENCODER))
+    # print "-realMeanPosition: ", value
+    # print "-const_encoder: ", CONST_ENCODER
+    angle = int(value/float(sampleSize) * CONST_ENCODER)
+    print "-angle: ", angle
+    printAngle(angle)
+    return angle
+
+    # print("endrealMeanPosition")
+
+def goToDegree(degree):
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    if degree >= MIN_ANGLE and degree <= MAX_ANGLE:
+        realPosition = realMeanPosition()
+
+        # print "-realPosition: ", realPosition
+
+        if (realPosition < (degree - ERRO)) or (realPosition > (degree + ERRO)):
+            print "-should go to: ", degree 
+            distance = realPosition - degree
+            if distance < 0:
+                goClockWise(abs(distance))
+            else:
+                goCClockWise(distance)
+            realPosition = realMeanPosition()
+        else:
+            motorStop()
+            motorFree()
+
+    # print("endgoToDegree")
+
+def newMap(x, in_min, in_max, out_min, out_max):
+    ## http://forum.arduino.cc/index.php?topic=38006.0
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+    # print("endnewMap")
+
+def motorMap(distance):
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    return newMap(distance, MIN_ANGLE, MAX_ANGLE, MIN_POWER, MAX_POWER)
+
+    # print("endmotorMap")
+
+# end -- motor functions
+
+
+# begin -- functions "arduino"
+
 def pinMode(pin, direction):
-  # gets the real pin
-  pin = pinDict[pin]
-  pinsSet.append(pin)
-  try:
-    with open("/sys/class/gpio/export", "w") as openFile:
-      openFile.write(str(pin))
-      openFile.close()
-  except IOError:
-      print("INFO: GPIO %d already exists, skipping export", pin)
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
-  gpioFolder = "/sys/class/gpio/gpio" + str(pin)
+    # gets the real pin
+    pin = pinDict[pin]
+    pinsSet.append(pin)
+    try:
+        with open("/sys/class/gpio/export", "w") as openFile:
+            openFile.write(str(pin))
+            openFile.close()
+    except IOError:
+        print("INFO: GPIO %d already exists, skipping export" % pin)
 
-  openFile = open(gpioFolder + "/direction", "w")
-  openFile.write(direction)
-  openFile.close()
+    try:
+        with open("/sys/class/gpio/gpio" + str(pin) + "/direction", "w") as openFile:
+            openFile.write(direction)
+            openFile.close()
+    except IOError:
+        print("INFO: Can't set direction in GPIO %d" % pin)
 
-  openFile = open(gpioFolder + "/drive", "w")
-  openFile.write(DIGITALPINMODE)
-  openFile.close()
+    # print("printpinMode")
+
+def pinModeDigital(pin, direction):
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    pinMode(pin, direction)
+    pin = pinDict[pin]
+
+    try:
+        with open("/sys/class/gpio/gpio" + str(pin) + "/drive", "w") as openFile:
+            openFile.write(DIGITALPINMODE)
+            openFile.close()
+    except IOError:
+        print("INFO: Can't set drive mode in GPIO %d" % pin)
+
+    # print("endpinModeDigital")
 
 def pinModeAnalog(pin):
-  pinMode(pin, INPUT)
-  digitalWrite(pin, 0)
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    pinMode(pin, OUTPUT)
+    digitalWrite(pin, 0)
+
+    # print("endpinModeAnalog")
 
 def pinModePWM(pin):
-  pin = pinDict[pin]
-  pinsSetPWM.append(pin)
-  try:
-    with open("/sys/class/pwm/pwmchip0/export","w") as export:
-      export.write(str(pin))
-  except IOError:
-    print "IOError: could not export pwm"
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
-  try:
-    with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/enable","w") as enable:
-      enable.write("1")
-  except IOError:
-    print "IOError: could not enable pwm"
+    pin = pinDict[pin]
+    pinsSetPWM.append(pin)
+    try:
+        with open("/sys/class/pwm/pwmchip0/export","w") as export:
+            export.write(str(pin))
+            export.close()
+    except IOError:
+        print("IOError: could not export pwm %d" % pin)
 
-  try:
-    with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/period","w") as p:
-      p.write(str(PERIOD))
-  except IOError:
-    print "IOError: could not set pwm period"
+    try:
+        with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/enable","w") as enable:
+            enable.write("1")
+            enable.close()
+    except IOError:
+        print("IOError: could not enable pwm %d" % pin)
 
+    try:
+        with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/period","w") as p:
+            p.write(str(PERIOD))
+            p.close()
+    except IOError:
+        print("IOError: could not set pwm period %d" % pin)
 
+    # print("endpinModePWM")
 
 def digitalRead(pin):
-  # gets the real pin
-  pin = pinDict[pin]
-  openFile = open("/sys/class/gpio/gpio" + str(pin) + "/value", "r")
-  value = str(openFile.read())
-  openFile.close()
-  return value
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    # gets the real pin
+    pin = pinDict[pin]
+    value = 0
+    try:
+        with open("/sys/class/gpio/gpio" + str(pin) + "/value", "r") as openFile:
+            value = str(openFile.read())
+            openFile.close()
+    except IOError:
+        print("IOError: could not read from GPIO %d" % pin)
+
+    # print("enddigitalRead")
+
+    return value
   
 def digitalWrite(pin, value):
-  # gets the real pin
-  pin = pinDict[pin]
-  openFile = open("/sys/class/gpio/gpio" + str(pin) + "/value", "w")
-  openFile.write(str(value))
-  openFile.close()
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    # gets the real pin
+    pin = pinDict[pin]
+    print "digitalwrite: " ,pin, value
+    try:
+        with open("/sys/class/gpio/gpio" + str(pin) + "/value", "w") as openFile:
+            openFile.write(str(value))
+            openFile.close()
+    except IOError:
+        print("IOError: could not write value to GPIO %d" % pin)
+
+    # print("endigitalWrite")
 
 def analogRead(pin):
-  # gets the number of pin AX where X is a number 
-  pin = pin[1]
-  try:
-    with open("/sys/bus/iio/devices/iio:device0/in_voltage" + str(pin) + "_raw", 'r') as openFile:
-      return openFile.read()
-  except IOError:
-    print("IOError: Could't read in_voltage" + str(pin))
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    # gets the number of pin AX where X is a number 
+    pin = pin[1]
+    try:
+        with open("/sys/bus/iio/devices/iio:device0/in_voltage" + str(pin) + "_raw", 'r') as openFile:
+            value = openFile.read()
+            openFile.close()
+        return value
+    except IOError:
+            print("IOError: Could't read in_voltage" + str(pin))
 
 def analogWrite(pin, duty_cycle):
-  # gets the real pin
-  pin = pinDict[pin]
-  try:
-    with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w") as d:
-      d.write(str(duty_cycle))
-  except IOError:
-    print "IOError: could not set pwm duty_cycle"
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+
+    # gets the real pin
+    pin = pinDict[pin]
+    try:
+        with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w") as d:
+            d.write(str(MAX_POWER if duty_cycle > MAX_POWER else duty_cycle))
+            d.close()
+    except IOError:
+        print("IOError: could not set pwm duty_cycle")
+
+    # time.sleep(0.5)
 
 def println(s):
-  openFile = open("/dev/ttyGS0", "w")
-  openFile.write(s + "\n")
-  openFile.close()
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+    print(s+"\n")
+    try:
+        with open("/dev/ttyGS0", "w") as openFile:
+            openFile.write(s + "\n")
+            openFile.close()
+    except IOError:
+        print("IOError: could not write to /dev/ttyGS0")
 
 def printl(s):
-  openFile = open("/dev/ttyGS0", "w")
-  openFile.write(s)
-  openFile.close()
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
+    print(s)
+
+    try:
+        with open("/dev/ttyGS0", "w") as openFile:
+            openFile.write(s)
+            openFile.close()
+    except IOError:
+        print("IOError: could not write to /dev/ttyGS0")
+
+# end -- functions "arduino"
+
+# begin -- other functions
 
 def quit():
-  unexport()
-  exit(0)
+    unexport()
+    exit(0)
 
 def unexport():
-  for pin in pinsSet:
-    try:
-      with open("/sys/class/gpio/unexport", "w") as openFile:
-        openFile.write(str(pin))
-    except IOError:
-      print("INFO: GPIO %d dosen't exists, skipping unexport", pin)
+    global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
 
-  for pin in pinsSetPWM:
-    try:
-      with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w") as d:
-        d.write(str(0))
-    except IOError:
-      print "IOError: could not set pwm duty_cycle"
+    for pin in pinsSet:
+        try:
+            with open("/sys/class/gpio/unexport", "w") as openFile:
+                openFile.write(str(pin))
+                openFile.close()
+        except IOError:
+            print("INFO: GPIO %d dosen't exists, skipping unexport" % pin)
+
+    for pin in pinsSetPWM:
+        try:
+            with open("/sys/class/pwm/pwmchip0/pwm" + str(pin) + "/duty_cycle","w") as d:
+                d.write(str(0))
+                d.close()
+        except IOError:
+            print "IOError: could not set pwm duty_cycle"
     
-    try:
-      with open("/sys/class/pwm/pwmchip0/unexport","w") as openFile:
-        openFile.write(str(pin))
-    except IOError:
-      print("INFO: PWM %d dosen't exists, skipping unexport", pin)
+        try:
+            with open("/sys/class/pwm/pwmchip0/unexport","w") as openFile:
+                openFile.write(str(pin))
+                openFile.close()
+        except IOError:
+            print("INFO: PWM %d dosen't exists, skipping unexport" % pin)
 
+# end -- other "arduino"
 
-def main():
-  pinMode(LED, OUTPUT)
-  pinMode(PIN7, INPUT)
-  pinModeAnalog(PINA0)
-  pinMode(LEDOFF, OUTPUT)
-  pinMode(PININ1, OUTPUT)
-  pinMode(PININ2, OUTPUT)
-  pinModePWM(PINPWM)
-
-  duty_cycle = 400000
-  period = 1000000
-  while True:
-    print(pinsSet)
-    print(pinsSetPWM)
-    # if is some user input to read 
-    if select.select([sys.stdin,],[],[],0.0)[0]:
-      if sys.stdin.read(1) == 'e':
-        quit()
-    
-    print("on")
-    println("on")
-    print("analogRead = " + analogRead(PINA0))
-    print("digitalRead = " + digitalRead(PIN7))
-
-    digitalWrite(PININ1, LOW)
-    analogWrite(PINPWM, duty_cycle)
-
-    digitalWrite(LED, HIGH)
-    digitalWrite(LEDOFF, HIGH)
-    time.sleep(1)
-    
-    print("off")
-    println("off")
-    
-    print(digitalRead(PIN7))
-    
-    digitalWrite(LED, LOW)
-    digitalWrite(LEDOFF, LOW)
-
-    time.sleep(1)
-
-    duty_cycle = (duty_cycle + 100000)
-    if duty_cycle > 1000000:
-      duty_cycle = 400000
-
-main() 
+if __name__ == "__main__":
+    setup()
+    while True:
+        # if is some user input to read 
+        if select.select([sys.stdin,],[],[],0.0)[0]:
+            if sys.stdin.read(1) == 'e':
+                quit()
+                
+        serialRead()
+        goToDegree(inputAngle)

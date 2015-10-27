@@ -12,7 +12,7 @@ OUTPUT = "out"
 INPUT = "in"
 PERIOD = 1000000 #PWM Period
 # pinmap arduino -> galileo
-pinDict = {'A0': 37,'A1': 36, 'A2': 23, 'A3': 22, 2: 14, 3: 3, 4: 28, 5: 5, 6: 6, 7: 27, 8: 26, 9: 1, 10: 7, 11: 4, 12: 38, 13: 39, 'ledGalileo': 3}
+pinDict = {'A0': 37,'A1': 36, 'A2': 23, 'A3': 22, 2: 14, 3: 3, 4: 28, 5: 5, 6: 6, 7: 27, 8: 26, 9: 1, 10: 7, 11: 25, 12: 38, 13: 39, 'ledGalileo': 3}
 
 # When configured for output GPIO ports that are connected to CY8C9520A can be configured to one of the following drive modes:
   # Resistive high, strong low (drive = pullup)
@@ -114,9 +114,10 @@ def digitalRead(pin):
 
     # gets the real pin
     pin = pinDict[pin]
+    value = 0
     try:
         with open("/sys/class/gpio/gpio" + str(pin) + "/value", "r") as openFile:
-            openFile = str(openFile.read())
+            value = str(openFile.read())
             openFile.close()
     except IOError:
         print("IOError: could not read from GPIO %d" % pin)
@@ -136,8 +137,6 @@ def digitalWrite(pin, value):
             openFile.close()
     except IOError:
         print("IOError: could not write value to GPIO %d" % pin)
-
-    print("endigitalWrite")
 
 def analogRead(pin):
     # global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -163,6 +162,10 @@ def analogWrite(pin, duty_cycle):
             d.close()
     except IOError:
         print("IOError: could not set pwm duty_cycle")
+
+def newMap(x, in_min, in_max, out_min, out_max):
+    ## http://forum.arduino.cc/index.php?topic=38006.0
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
 def println(s):
     # global inString, isHearing, inputAngle, lastPrintedAngle, pinsSet, pinsSetPWM, selectAngle, selectMode
@@ -228,32 +231,39 @@ def main():
     pinModeDigital(PININ2, OUTPUT)
     pinModePWM(PINPWM)
 
-    duty_cycle = 400000
+    duty_cycle = 200000
     period = 1000000
     while True:
-        print(pinsSet)
-        print(pinsSetPWM)
+        # print(pinsSet)
+        # print(pinsSetPWM)
         # if is some user input to read 
         if select.select([sys.stdin,],[],[],0.0)[0]:
             if sys.stdin.read(1) == 'e':
                 quit()
     
-        print("on")
-        println("on")
-        print("analogRead = " + analogRead(PINA0))
-        print("digitalRead = " + digitalRead(PIN7))
+        # print("on")
+        # println("on")
+        value = 0
+        for i in xrange(1,10):
+            value += int(analogRead(PINA0))
+        value /= 10
+        # value = abs(value + 220)
+        print("analogRead = " + str(value))
+        print("angle = " + str(newMap(value, 2, 3685, 0, 247)))
+        # print("digitalRead = " + digitalRead(PIN7))
 
         digitalWrite(PININ1, LOW)
+        digitalWrite(PININ2, HIGH)
         analogWrite(PINPWM, duty_cycle)
 
         digitalWrite(LED, HIGH)
         digitalWrite(LEDOFF, HIGH)
-        time.sleep(1)
+        # time.sleep(1)
         
-        print("off")
-        println("off")
+        # print("off")
+        # println("off")
         
-        print(digitalRead(PIN7))
+        # print(digitalRead(PIN7))
         
         digitalWrite(LED, LOW)
         digitalWrite(LEDOFF, LOW)
