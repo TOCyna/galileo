@@ -233,6 +233,7 @@ def goToDegree(degree):
         realPosition = realMeanPosition()
 
         if (realPosition < (degree - ERRO)) or (realPosition > (degree + ERRO)):
+            digitalWrite(LED, LOW)
             dbug("-inputAngle: " + str(inputAngle))
             dbug("-realPosition: " + str(realPosition))
             distance = realPosition - degree
@@ -244,6 +245,7 @@ def goToDegree(degree):
         else:
             motorStop()
             motorFree()
+            digitalWrite(LED, HIGH)
 
 def pinsRead():
     global selectAngle, selectMode
@@ -257,6 +259,7 @@ def pinsRead():
     selectAngle[3] = digitalRead(B4)
     selectAngle[4] = digitalRead(MSB)
     # dbug("M: " + str(selectMode[0]) + " LSB: " + str(selectAngle[0]) + " " + str(selectAngle[1]) + " " + str(selectAngle[2]) + " " + str(selectAngle[3]) + " " + str(selectAngle[4]))
+
 def binTodegree():
     decimal = 0
     
